@@ -10,11 +10,87 @@ Written in **pure Go** (stdlib only).
 go run ./cmd/ppdm-simulator
 ```
 
-Or build a binary:
+Or build with Make:
 
 ```bash
-go build -o ppdm-simulator ./cmd/ppdm-simulator
-./ppdm-simulator
+make build
+./dist/ppdm-simulator
+```
+
+Binaries are written to `dist/` only — not the project root.
+
+## Building
+
+Requires [Go 1.22+](https://go.dev/dl/).
+
+### Make targets
+
+```bash
+make build          # current OS/arch -> dist/ppdm-simulator
+make release        # all platforms -> dist/
+make linux-amd64    # dist/ppdm-simulator-linux-amd64
+make linux-arm64    # dist/ppdm-simulator-linux-arm64
+make darwin-amd64   # dist/ppdm-simulator-darwin-amd64
+make darwin-arm64   # dist/ppdm-simulator-darwin-arm64
+make test           # run tests
+make clean          # remove dist/
+make run            # go run ./cmd/ppdm-simulator
+```
+
+### Native build
+
+Build for the current OS and architecture:
+
+```bash
+mkdir -p dist
+go build -o dist/ppdm-simulator ./cmd/ppdm-simulator
+```
+
+### Cross-compilation
+
+Build release binaries for Linux and macOS on `arm64` and `amd64`:
+
+```bash
+mkdir -p dist
+
+# Linux amd64
+GOOS=linux GOARCH=amd64 go build -o dist/ppdm-simulator-linux-amd64 ./cmd/ppdm-simulator
+
+# Linux arm64
+GOOS=linux GOARCH=arm64 go build -o dist/ppdm-simulator-linux-arm64 ./cmd/ppdm-simulator
+
+# macOS amd64 (Intel)
+GOOS=darwin GOARCH=amd64 go build -o dist/ppdm-simulator-darwin-amd64 ./cmd/ppdm-simulator
+
+# macOS arm64 (Apple Silicon)
+GOOS=darwin GOARCH=arm64 go build -o dist/ppdm-simulator-darwin-arm64 ./cmd/ppdm-simulator
+```
+
+| Platform | Binary |
+|----------|--------|
+| Linux x86_64 | `dist/ppdm-simulator-linux-amd64` |
+| Linux ARM64 | `dist/ppdm-simulator-linux-arm64` |
+| macOS Intel | `dist/ppdm-simulator-darwin-amd64` |
+| macOS Apple Silicon | `dist/ppdm-simulator-darwin-arm64` |
+
+Run on the target machine (ensure `openapi-json/` is present in the working directory):
+
+```bash
+chmod +x dist/ppdm-simulator-linux-amd64
+./dist/ppdm-simulator-linux-amd64
+```
+
+On macOS, remove the quarantine flag if the binary was downloaded or copied from another machine:
+
+```bash
+xattr -d com.apple.quarantine dist/ppdm-simulator-darwin-arm64 2>/dev/null || true
+./dist/ppdm-simulator-darwin-arm64
+```
+
+Optional: strip debug symbols for smaller binaries:
+
+```bash
+GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/ppdm-simulator-linux-amd64 ./cmd/ppdm-simulator
 ```
 
 The server listens on `https://0.0.0.0:8443` by default (matching the PPDM default port). Only HTTPS is accepted — plain HTTP requests are rejected.
@@ -215,6 +291,7 @@ curl -sk https://localhost:8443/health | jq .
 
 ```
 cmd/ppdm-simulator/   # CLI entry point
+dist/                 # built binaries (gitignored)
 examples/             # login + API usage examples
 internal/
   auth/               # login / token / logout
