@@ -177,13 +177,33 @@ API calls are logged by default to help troubleshooting:
 
 Sensitive fields (`password`, tokens) are redacted. Use `-quiet` to disable logging.
 
+## OpenAPI specifications
+
+The simulator reads OpenAPI JSON files from `openapi-json/`. Download them from the [Dell PowerProtect Data Manager REST API](https://developer.dell.com/apis/4378) documentation on [developer.dell.com](https://developer.dell.com).
+
+For **version 20.1.0**, open each module below, then use **Export** to download the OpenAPI JSON file and place it in `openapi-json/`:
+
+| API | Module page | Export file (example) |
+|-----|-------------|------------------------|
+| v1 (license) | [Module 9627](https://developer.dell.com/apis/4378/versions/20.1.0/modules/9627) | `9627-20.1.0.json` |
+| v2 | [Module 9765](https://developer.dell.com/apis/4378/versions/20.1.0/modules/9765) | `9765-20.1.0.json` |
+| v3 | [Module 9628](https://developer.dell.com/apis/4378/versions/20.1.0/modules/9628) | `9628-20.1.0.json` |
+
+Steps for each module:
+
+1. Open the module URL (v1, v2, or v3).
+2. Click **Export**.
+3. Save the JSON file into `openapi-json/` using the naming pattern `<module-id>-<version>.json`.
+
+To use a different PPDM release, select the target version on the [API versions page](https://developer.dell.com/apis/4378), then export the corresponding v1, v2, and v3 modules.
+
 ## Covered APIs
 
-| Spec file | API version | Base path |
-|-----------|-------------|-----------|
-| `9627-20.1.0.json` | v1 (license) | `/dpilm/api/v1/` |
-| `9765-20.1.0.json` | v2 | `/api/v2/` |
-| `9628-20.1.0.json` | v3 | `/api/v3/` |
+| Spec file | API version | Base path | Source |
+|-----------|-------------|-----------|--------|
+| `9627-20.1.0.json` | v1 (license) | `/dpilm/api/v1/` | [Module 9627](https://developer.dell.com/apis/4378/versions/20.1.0/modules/9627) |
+| `9765-20.1.0.json` | v2 | `/api/v2/` | [Module 9765](https://developer.dell.com/apis/4378/versions/20.1.0/modules/9765) |
+| `9628-20.1.0.json` | v3 | `/api/v3/` | [Module 9628](https://developer.dell.com/apis/4378/versions/20.1.0/modules/9628) |
 
 ## Health check
 
