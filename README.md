@@ -1,0 +1,212 @@
+# PPDM API Simulator
+
+A lightweight REST API simulator for **Dell PowerProtect Data Manager (PPDM)**. It loads the OpenAPI specifications from `openapi-json/` and returns schema-based mock responses for every documented endpoint (v1 license API, v2, and v3).
+
+Written in **pure Go** (stdlib only).
+
+## Quick start
+
+```bash
+go run ./cmd/ppdm-simulator
+```
+
+Or build a binary:
+
+```bash
+go build -o ppdm-simulator ./cmd/ppdm-simulator
+./ppdm-simulator
+```
+
+The server listens on `https://0.0.0.0:8443` by default (matching the PPDM default port). Only HTTPS is accepted — plain HTTP requests are rejected.
+
+## Authentication
+
+By default, protected endpoints require a bearer token obtained via login:
+
+```bash
+# Login (-k skips self-signed certificate verification)
+curl -sk -X POST https://localhost:8443/api/v2/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' | jq .
+
+# Use the access_token from the response
+curl -sk https://localhost:8443/api/v2/assets \
+  -H "Authorization: Bearer <access_token>" | jq .
+```
+
+To disable authentication (useful for quick local testing):
+
+```bash
+go run ./cmd/ppdm-simulator -no-auth
+```
+
+## Examples: login + get assets
+
+Requires [jq](https://jqlang.github.io/jq/) for pretty-printed JSON in shell examples.
+
+Start the simulator first:
+
+```bash
+go run ./cmd/ppdm-simulator
+```
+
+### 1. Two-step curl
+
+```bash
+# Step 1: login
+curl -sk -X POST https://localhost:8443/api/v2/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' | jq .
+
+# Step 2: copy access_token from the response, then:
+curl -sk 'https://localhost:8443/api/v2/assets?page=1&pageSize=10' \
+  -H 'Authorization: Bearer <access_token>' | jq .
+```
+
+### 2. One-liner curl (bash)
+
+```bash
+TOKEN=$(curl -sk -X POST https://localhost:8443/api/v2/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' \
+  | jq -r .access_token) \
+&& curl -sk "https://localhost:8443/api/v2/assets?page=1&pageSize=10" \
+  -H "Authorization: Bearer ${TOKEN}" | jq .
+```
+
+### 3. One-liner curl with jq
+
+```bash
+TOKEN=$(curl -sk -X POST https://localhost:8443/api/v2/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin"}' | jq -r .access_token) \
+&& curl -sk "https://localhost:8443/api/v2/assets?page=1&pageSize=10" \
+  -H "Authorization: Bearer ${TOKEN}" | jq .
+```
+
+### 4. Shell script
+
+```bash
+./examples/login-get-assets.sh
+```
+
+Optional environment variables:
+
+```bash
+PPDM_URL=https://localhost:8443 PPDM_USER=admin PPDM_PASSWORD=admin ./examples/login-get-assets.sh
+```
+
+### 5. Go client
+
+```bash
+go run ./examples/login-get-assets.go
+```
+
+With custom settings:
+
+```bash
+PPDM_URL=https://localhost:8443 PPDM_USER=admin PPDM_PASSWORD=admin go run ./examples/login-get-assets.go
+```
+
+### 6. PowerShell
+
+```powershell
+$login = Invoke-RestMethod -SkipCertificateCheck -Method Post `
+  -Uri "https://localhost:8443/api/v2/login" `
+  -ContentType "application/json" `
+  -Body '{"username":"admin","password":"admin"}'
+
+$login | ConvertTo-Json -Depth 10
+
+$assets = Invoke-RestMethod -SkipCertificateCheck -Method Get `
+  -Uri "https://localhost:8443/api/v2/assets?page=1&pageSize=10" `
+  -Headers @{ Authorization = "Bearer $($login.access_token)" }
+
+$assets | ConvertTo-Json -Depth 10
+```
+
+Expected flow in simulator logs:
+
+```
+--> POST /api/v2/login op=login ...
+<-- POST /api/v2/login 200 ...
+--> GET /api/v2/assets op=getAssets auth=Bearer eyJhbGci...
+<-- GET /api/v2/assets 200 ...
+```
+
+
+## Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-host` | `0.0.0.0` | Bind address |
+| `-port` | `8443` | Bind port |
+| `-cert` | `./ssl/cert.pem` | TLS certificate file (PEM) |
+| `-key` | `./ssl/key.pem` | TLS private key file (PEM) |
+| `-ssl-dir` | `ssl` | Directory for stored TLS files |
+| `-openapi-dir` | `openapi-json` | Path to OpenAPI JSON files |
+| `-no-auth` | off | Skip bearer token validation |
+| `-quiet` | off | Disable API request/response logging |
+
+When `-cert` and `-key` are omitted, the simulator loads `cert.pem` and `key.pem` from `./ssl/`. If they are missing, invalid, or expired, a new self-signed certificate is generated.
+
+Managed self-signed certificates:
+- **Lifetime:** 7 days
+- **Auto-renewal:** checked every hour while the server is running (renews when less than 24 hours remain)
+- **Hot reload:** new TLS handshakes use the renewed certificate without restarting the server
+
+Custom certificates provided via `-cert` and `-key` are not auto-renewed.
+
+## Debugging
+
+API calls are logged by default to help troubleshooting:
+
+```
+--> POST /api/v2/login op=login auth=-
+  {
+    "password": "***",
+    "username": "admin"
+  }
+<-- POST /api/v2/login 200 1ms
+  {
+    "access_token": "***",
+    "expires_in": 3600,
+    ...
+  }
+```
+
+Sensitive fields (`password`, tokens) are redacted. Use `-quiet` to disable logging.
+
+## Covered APIs
+
+| Spec file | API version | Base path |
+|-----------|-------------|-----------|
+| `9627-20.1.0.json` | v1 (license) | `/dpilm/api/v1/` |
+| `9765-20.1.0.json` | v2 | `/api/v2/` |
+| `9628-20.1.0.json` | v3 | `/api/v3/` |
+
+## Health check
+
+```bash
+curl -sk https://localhost:8443/health | jq .
+```
+
+## Project layout
+
+```
+cmd/ppdm-simulator/   # CLI entry point
+examples/             # login + API usage examples
+internal/
+  auth/               # login / token / logout
+  loader/             # OpenAPI spec loader + path matching
+  mock/               # schema-based response generator
+  server/             # HTTP server
+openapi-json/         # PPDM OpenAPI specs
+```
+
+## Notes
+
+- Responses are **generated from OpenAPI response schemas** (`responses.{status}.content.application/json.schema`), including required fields, enums, `$ref`, and `allOf`.
+- Error responses use the operation's documented schema (typically `ErrorMessage`).
+- `POST`, `PUT`, `PATCH`, and `DELETE` return success responses without persisting state.
+- Pagination query params (`page`, `pageSize`) are reflected in list responses when applicable.
